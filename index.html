@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GDP Trendline Of The Top 10 Largest Economy (1960-2010)</title>
+</head>
+<body>
+  <div id="country-filter">
+    <label><input class="country" type="checkbox" value="Canada">Canada</label>
+    <label><input class="country" type="checkbox" value="Brazil">Brazil</label>
+    <label><input class="country" type="checkbox" value="China">China</label>
+    <label><input class="country" type="checkbox" value="India">India</label>
+    <label><input class="country" type="checkbox" value="Japan">Japan</label>
+    <label><input class="country" type="checkbox" value="United_States">United States</label>
+    <label><input class="country" type="checkbox" value="Germany">Germany</label>
+    <label><input class="country" type="checkbox" value="France">France</label>
+    <label><input class="country" type="checkbox" value="Italy">Italy</label>
+    <label><input class="country" type="checkbox" value="United_Kingdom">United Kingdom</label>
+  </div>
+  <h1>GDP Trendline Of The Top 10 Largest Economy (1960-2016)</h1>
+  <div id="chart-container"></div>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script>
+    let allCheckBox = document.querySelectorAll('.country');
+    const checkedCountries = [];
+
+    d3.json('data.json').then(data => {
+      const chartContainer = d3.select('#chart-container');
+
+      const width = 1000;
+      const height = 600;
+      const margin = { top: 50, right: 150, bottom: 80, left: 50 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+
+      const svg = chartContainer
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+      const g = svg
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+      const xScale = d3.scaleLinear().domain(d3.extent(data['United_States'], d => d.Year)).range([0, innerWidth]);
+      const yScale = d3.scaleLinear().domain([0, d3.max([...data.Canada, ...data['United_States']], d => d.GDP)]).range([innerHeight, 0]);
+
+      const xAxis = d3.axisBottom(xScale);
+      const yAxis = d3.axisLeft(yScale).tickFormat(d3.format(".2s"));
+
+      g.append('g').attr('transform', `translate(0,${innerHeight})`).call(xAxis);
+      g.append('g').call(yAxis);
+
+      g.append('text')
+        .attr('class', 'x-axis-title')
+        .attr('text-anchor', 'middle')
+        .attr('x', innerWidth / 2)
+        .attr('y', height - margin.bottom)
+        .text('Year');
+
+      g.append('text')
+        .attr('class', 'y-axis-title')
+        .attr('text-anchor', 'middle')
+        .attr('x', 0 - innerHeight / 2)
+        .attr('y', -35)
+        .attr('transform', 'rotate(-90)')
+        .text('GDP (USD$)');
+
+      const lineGenerator = d3.line()
+        .x(d => xScale(d.Year))
+        .y(d => yScale(d.GDP));
+
+      const countryStrokeColors = {
+        Canada: 'blue',
+        Brazil: 'green',
+        China: 'red',
+        India: 'purple',
+        Japan: 'black',
+        United_States: 'darkblue',
+        Germany: 'yellow',
+        France: 'orange',
+        Italy: 'navy',
+        United_Kingdom: 'teal',
+      };
+
+      const targetCountries = ['Canada', 'Brazil', 'China', 'India', 'Japan', 'United_States', 'Germany', 'France', 'Italy', 'United_Kingdom'];
+
+      function updateChart() {
+        const countriesToShow = checkedCountries.length > 0 ? checkedCountries : targetCountries;
+        g.selectAll('path').remove();
+        countriesToShow.forEach((country) => {
+          g.append('path')
+            .datum(data[country])
+            .attr('class', `${country}`)
+            .attr('fill', 'none')
+            .attr('stroke', countryStrokeColors[country])
+            .attr('stroke-width', 2)
+            .attr('d', lineGenerator);
+        });
+        targetCountries.forEach((country) => {
+          if (!countriesToShow.includes(country)) {
+            g.selectAll(`path.${country}`).remove();
+          }
+        });
+      }
+
+      updateChart();
+
+      allCheckBox.forEach((checkbox) => {
+        checkbox.addEventListener('change', (event) => {
+          if (event.target.checked) {
+            checkedCountries.push(event.target.value);
+          } else {
+            var index = checkedCountries.indexOf(event.target.value);
+            if (index !== -1) {
+              checkedCountries.splice(index, 1);
+            }
+          }
+          updateChart();
+          targetCountries.forEach((country) => {
+            if (checkedCountries.includes(country)) {
+              g.append('path')
+                .datum(data[country])
+                .attr("class", `${country}`)
+                .attr('fill', 'none')
+                .attr('stroke', countryStrokeColors[country])
+                .attr('stroke-width', 2)
+                .attr('d', lineGenerator);
+            }
+          });
+          targetCountries.forEach((country) => {
+            if (!checkedCountries.includes(country)) {
+              g.selectAll(`path.${country}`).remove();
+            }
+          });
+        });
+      });
+
+      g.selectAll('.circle-group')
+        .data(Object.values(data))
+        .enter()
+        .append('g')
+        .attr('class', 'circle-group')
+        .selectAll('.circle')
+        .data(d => d)
+        .enter()
+        .append('circle')
+        .attr('cx', d => xScale(d.Year))
+        .attr('cy', d => yScale(d.GDP))
+        .attr('r', 5)
+        .attr('fill', d => {
+          switch (d.Country) {
+            default: return 'rgba(0,0,0,0)';
+          }
+        })
+        .on('mouseover', (event, d) => {
+          const country = d.Country;
+          const year = d.Year;
+          const gdp = d.GDP;
+          const formatGDP = d3.format(".4s");
+          const formattedGDP = formatGDP(gdp);
+
+          const tooltip = svg.append('g')
+            .attr('class', 'tooltip')
+            .attr('transform', `translate(${xScale(year) + margin.left + 10},${yScale(gdp) + margin.top - 10})`);
+
+          tooltip.append('text')
+            .text(`Year: ${year}`)
+            .attr('x', 5)
+            .attr('y', 15);
+
+          tooltip.append('text')
+            .text(`GDP: ${formattedGDP}`)
+            .attr('x', 5)
+            .attr('y', 30);
+        })
+        .on('mouseout', () => {
+          svg.select('.tooltip').remove();
+        });
+
+      const legend = g
+        .append('g')
+        .attr('class', 'legend')
+        .attr('transform', `translate(0, 0)`);
+
+      const legendRectSize = 15;
+      const legendSpacing = 6;
+      const legendItemsPerRow = 5;
+
+      const legendData = [
+        { label: 'Canada', color: 'blue' },
+        { label: 'Brazil', color: 'green' },
+        { label: 'China', color: 'red' },
+        { label: 'Japan', color: 'black' },
+        { label: 'India', color: 'purple' },
+        { label: 'Germany', color: 'yellow' },
+        { label: 'France', color: 'orange' },
+        { label: 'Italy', color: 'navy' },
+        { label: 'United Kingdom', color: 'teal' },
+        { label: 'United States', color: 'darkblue' },
+      ];
+
+      const legendItems = legend
+        .selectAll('.legend-item')
+        .data(legendData)
+        .enter()
+        .append('g')
+        .attr('class', 'legend-item')
+        .attr('transform', (d, i) => {
+          const row = Math.floor(i / legendItemsPerRow);
+          const col = i % legendItemsPerRow;
+          return `translate(${col * 120},${row * 20})`;
+        });
+
+      legendItems
+        .append('rect')
+        .attr('width', 12)
+        .attr('height', 12)
+        .attr('fill', d => d.color);
+
+      legendItems
+        .append('text')
+        .attr('x', 18)
+        .attr('y', 6)
+        .attr('dy', '0.32em')
+        .text(d => d.label);
+    });
+  </script>
+</body>
+</html>
